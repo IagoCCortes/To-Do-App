@@ -14,4 +14,9 @@ mongoose.connect(process.env.DB_Connection_String, {
     useNewUrlParser: true,
 });
 
+app.use(express.json())
+
+const subscribersRouter = require('./api/subscribers')
+app.use('/subscribers', subscribersRouter)
+
 app.listen(3000, () => console.log('server started'))
