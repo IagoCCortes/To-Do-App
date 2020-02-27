@@ -5,14 +5,10 @@ const mongoose = require('mongoose')
 
 app.listen(3000, () => console.log('server started'))
 
-// mongoose.connect(process.env.DATABASE_URL, { useNewUrlParser: true })
-// const db = mongoose.connection
-// db.on('error', (error) => console.error(error))
-// db.once('open', () => console.log('connected to database'))
-
-mongoose.connect(process.env.DB_Connection_String, {
-    useNewUrlParser: true,
-});
+mongoose.connect(process.env.DATABASE_URL, { useNewUrlParser: true })
+const db = mongoose.connection
+db.on('error', (error) => console.error(error))
+db.once('open', () => console.log('connected to database'))
 
 app.use(express.json())
 
