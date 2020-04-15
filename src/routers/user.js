@@ -1,9 +1,10 @@
 const express = require('express')
 const User = require('../models/user')
+const auth = require('../middleware/auth')
 
 const router = new express.Router()
 
-router.get('/users', async (req, res) => {
+router.get('/users', auth, async (req, res) => {
     try {
         const users = await User.find({})
         res.send(users)
@@ -12,7 +13,11 @@ router.get('/users', async (req, res) => {
     }
 })
 
-router.get('/users/:id', async (req, res) => {
+router.get('/users/me', auth, async (req, res) => {
+    res.send(req.user)
+})
+
+router.get('/users/:id', auth, async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
         if(!user)
@@ -24,7 +29,7 @@ router.get('/users/:id', async (req, res) => {
     }
 })
 
-router.patch('/users/:id', async (req, res) => {
+router.patch('/users/:id', auth, async (req, res) => {
     const updates = Object.keys(req.body)
     const allowedUpdates = ['birthday', 'name', 'email']
     const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
@@ -58,7 +63,7 @@ router.post('/users', async (req, res) => {
     }
 })
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', auth, async (req, res) => {
     try {
         const user = await User.findByIdAndDelete(req.params.id)
         if(!user)
