@@ -1,72 +1,107 @@
-const express = require('express')
-const Task = require('../models/task')
+const express = require("express");
+const Task = require("../models/task");
+const auth = require("../middleware/auth");
 
-const router = new express.Router()
+const router = new express.Router();
 
-router.get('/tasks', async (req, res) => {
-    try {
-        const tasks = await Task.find({})
-        res.send(tasks)
-    } catch(e) {
-        res.status(500).send()
-    }
-})
+// GET /tasks?completed=false/true
+// GET /tasks?limit={x E IN | 10 <= x <= 50}&skip={x E IN | 0 <= x < ∞}
+// GET /tasks?sortby=createdAt:asc/desc
+router.get("/tasks", auth, async (req, res) => {
+  const match = {};
+  const sort = {};
 
-router.get('/tasks/:id', async (req, res) => {
-    try {
-        const task = await Task.findById(req.params.id)
-        if(!task)
-            return res.status(404).send()
+  match.completedDate = req.query.completed === "true" ? { $ne: null } : null;
+  if (req.query.sortby) {
+    const [field, value] = req.query.sortby.split(":")
+    sort[field] = value === "asc" ? 1 : -1;
+  }
 
-        res.send(task)
-    } catch {
-        res.status(500).send()
-    }
-})
+  try {
+    await req.user
+      .populate({
+        path: "tasks",
+        match,
+        options: {
+          limit: parseInt(req.query.limit),
+          skip: parseInt(req.query.skip),
+          sort
+        }
+      })
+      .execPopulate();
+    res.send(req.user.tasks);
+  } catch (e) {
+    res.status(500).send();
+  }
+});
 
-router.patch('/tasks/:id', async (req, res) => {
-    const updates = Object.keys(req.body)
-    const allowedUpdates = ['description', 'dueDate', 'completedDate']
-    const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
+router.get("/tasks/:id", auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!task) return res.status(404).send();
 
-    if(!isValidOperation)
-        return res.status(400).send({ error: 'Invalid updates' })
+    res.send(task);
+  } catch {
+    res.status(500).send();
+  }
+});
 
-    try {
-        const task = await Task.findById(req.params.id)
+router.patch("/tasks/:id", auth, async (req, res) => {
+  const updates = Object.keys(req.body);
+  const allowedUpdates = ["description", "dueDate", "completedDate"];
+  const isValidOperation = updates.every((update) =>
+    allowedUpdates.includes(update)
+  );
 
-        updates.forEach((update) => task[update] = req.body[update])
-        await task.save()
-        if(!task)
-            return res.status(404).send()
+  if (!isValidOperation)
+    return res.status(400).send({ error: "Invalid updates" });
 
-        res.send(task)
-    } catch(error) {
-        res.status(400).send(error)
-    }
-})
+  try {
+    const task = await Task.findOne({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
 
-router.post('/tasks', async (req, res) => {
-    const task = new Task(req.body)
+    if (!task) return res.status(404).send();
 
-    try {
-        await task.save()
-        res.status(201).send(task)
-    } catch (error) {
-        res.status(400).send(error)
-    }
-})
+    updates.forEach((update) => (task[update] = req.body[update]));
+    await task.save();
+    res.send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
 
-router.delete('/tasks/:id', async (req, res) => {
-    try {
-        const task = await Task.findByIdAndDelete(req.params.id)
-        if(!task)
-            return res.status(404).send()
+router.post("/tasks", auth, async (req, res) => {
+  const task = new Task({
+    ...req.body,
+    owner: req.user._id,
+  });
 
-        res.send(task)
-    } catch {
-        res.status(500).send()
-    }
-})
+  try {
+    await task.save();
+    res.status(201).send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
 
-module.exports = router
+router.delete("/tasks/:id", auth, async (req, res) => {
+  try {
+    const task = await Task.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+
+    if (!task) return res.status(404).send();
+
+    res.send(task);
+  } catch {
+    res.status(500).send();
+  }
+});
+
+module.exports = router;
